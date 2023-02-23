@@ -1,0 +1,207 @@
+//      V1.5  Trail Stop Price                      `"~"`
+
+//  _,-""`""-~`)
+//(`~_,=========\
+// |---,___.-.__,\
+// |        o     \ ___  _,,,,_     _.--.
+//  \      `^`    /`_.-"~      `~-;`     \
+//   \_      _  .'                 `,     |
+//     |`-                           \'__/ 
+//    /                      ,_       \  `'-. 
+//   /    .-""~~--.            `"-,   ;_    /
+//  |              \               \  | `""`
+//   \__.--'`"-.   /_               |'
+//              `"`  `~~~---..,     |
+//    Lazy Bear                \ _.-'`-.
+//  Author: Sassiz              \       \
+//    Trade Robot                '.     /
+//      V1.5  Trail Stop Price     `"~"`
+
+//_____/\\\\\\\\\\\_______/\\\\\\\\\________/\\\\\\\\\\\_______/\\\\\\\\\\\____/\\\\\\\\\\\__/\\\\\\\\\\\\\\\______________/\\\\\\\\\___________/\\\\\____________/\\\\\_______/\\\\\\\\\\\\\\\_        
+// ___/\\\/////////\\\___/\\\\\\\\\\\\\____/\\\/////////\\\___/\\\/////////\\\_\/////\\\///__\////////////\\\_____________/\\\///////\\\_______/\\\///\\\________/\\\///\\\____\///////\\\/////__       
+//  __\//\\\______\///___/\\\/////////\\\__\//\\\______\///___\//\\\______\///______\/\\\_______________/\\\/_____________\/\\\_____\/\\\_____/\\\/__\///\\\____/\\\/__\///\\\________\/\\\_______      
+//   ___\////\\\_________\/\\\_______\/\\\___\////\\\___________\////\\\_____________\/\\\_____________/\\\/_______________\/\\\\\\\\\\\/_____/\\\______\//\\\__/\\\______\//\\\_______\/\\\_______     
+//    ______\////\\\______\/\\\\\\\\\\\\\\\______\////\\\___________\////\\\__________\/\\\___________/\\\/_________________\/\\\//////\\\____\/\\\_______\/\\\_\/\\\_______\/\\\_______\/\\\_______    
+//     _________\////\\\___\/\\\/////////\\\_________\////\\\___________\////\\\_______\/\\\_________/\\\/___________________\/\\\____\//\\\___\//\\\______/\\\__\//\\\______/\\\________\/\\\_______   
+//      __/\\\______\//\\\__\/\\\_______\/\\\__/\\\______\//\\\___/\\\______\//\\\______\/\\\_______/\\\/_____________________\/\\\_____\//\\\___\///\\\__/\\\_____\///\\\__/\\\__________\/\\\_______  
+//       _\///\\\\\\\\\\\/___\/\\\_______\/\\\_\///\\\\\\\\\\\/___\///\\\\\\\\\\\/____/\\\\\\\\\\\__/\\\\\\\\\\\\\\\___________\/\\\______\//\\\____\///\\\\\/________\///\\\\\/___________\/\\\_______ 
+//        ___\///////////_____\///________\///____\///////////_______\///////////_____\///////////__\///////////////____________\///________\///_______\/////____________\/////_____________\///________
+
+
+// Lazy Bear v1.4 1401-03-03
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Sassiz
+
+//@version=5
+strategy("SassizStocEMA-Lazy Bear v1.4", overlay=true,shorttitle="LazyBear",initial_capital=1000,currency=currency.USD,pyramiding=1,commission_type=strategy.commission.percent,commission_value=0.1,default_qty_type=strategy.percent_of_equity ,default_qty_value=100)
+
+trendIsLong= input.bool(false,title="UpTrend",group = "Trend Type",inline="Trend",confirm=true)
+trendIsShort= input.bool(false,title="DownTrend",group = "Trend Type",inline="Trend",confirm=true)
+slLong = input.float(1,title="Long Stop Loss (%)   ",minval=0.0, step=0.1,group = "SL",inline="TpSl",confirm=true) * 0.01//input.float(0.985,title="SL-Long",step=0.01)
+slShort = input.float(1,title="Short Stop Loss  (%)   ",minval=0.0, step=0.1,group = "SL",inline="TpSl",confirm=true) * 0.01//input.float(1.015,title="SL-Short",step=0.01)
+tpLong = input.float(1.5,title="Long Take Profit 1 (%)",minval=0.0, step=0.1,group = "TP",inline="TpSl",confirm=true) * 0.01//input.float(1.03,title="TP-Long",step=0.01)
+tpShort = input.float(1.5,title="Short Take Profit 1(%)",minval=0.0, step=0.1,group = "TP",inline="TpSl",confirm=true) * 0.01//input.float(0.97,title="TP-Short",step=0.01)
+tpLong2 = input.float(2,title="Long Take Profit 2 (%)",minval=0.0, step=0.1,group = "TP",inline="TpSl",confirm=true) * 0.01
+tpShort2 = input.float(2,title="Short Take Profit 2 (%)",minval=0.0, step=0.1,group = "TP",inline="TpSl",confirm=true) * 0.01
+//TP1_Ratio = input(title="Sell Postion Size % @ TP1", type=input.float, defval=50, step=1, group="TP & SL", tooltip="Example: 50 closing 50% of the position once TP1 is reached")/100
+
+upperBand1 = input.int(80,title="Upper-Band",confirm=true)
+lowerBand1 = input.int(20,title="Lower-Band",confirm=true)
+
+isFilterOn= input.bool(false,title="Filter",group = "Filter",inline="filterOn",confirm=true)
+lenFilter = input.int(9, minval=1, title="Filter Length",confirm=true,group = "Filter",inline="filterOn")
+
+//trade time zone
+StartTime = input.time(defval=timestamp('14 May 2022 00:00 +0000'), title='Start Time',group = "Strategy Time Range",confirm=true)
+EndTime = input.time(defval=timestamp('30 Jun 2022 23:59 +0000'), title='End Time',group = "Strategy Time Range",confirm=true)
+InDateRange = time>=StartTime and time<=EndTime
+bgcolor(color=InDateRange?color.new(color.blue,95):na)
+
+//ema 100 and ema 200
+lenEmaNear = input.int(100, minval=1, title="Near Length",confirm=true,group = "Options",inline="ema")
+lenFarNear = input.int(200, minval=1, title="Far Length",confirm=true,group = "Options",inline="ema")
+
+src = input.source(close, title="Source",group = "Options")
+offset = input.int(title="Offset", defval=0, minval=-500, maxval=500,confirm=true,group = "Options")
+outNearEma = ta.ema(src, lenEmaNear)
+outFarEma = ta.ema(src, lenFarNear)
+filterEma = ta.ema(src,lenFilter)
+
+// btc_close_30M = request.security('',biggerTF,src)
+// btc30Ema50 = ta.ema(btc_close_30M,50)
+// btc30Ema100 = ta.ema(btc_close_30M,100)
+// btc30Ema200 = ta.ema(btc_close_30M,200)
+// plot(isBiggerTF?btc30Ema50:na, title="BTF-50", color=color.green, offset=offset)
+// plot(isBiggerTF?btc30Ema100:na, title="BTF-100", color=color.red, offset=offset)
+// plot(isBiggerTF?btc30Ema200:na, title="BTF-200", color=color.orange, offset=offset)
+plot(outNearEma, title="EMA-Fast", color=color.white, offset=offset)
+plot(outFarEma, title="EMA-Slow", color=color.blue, offset=offset)
+plot(isFilterOn?filterEma:na, title="EMA-Filter", color=color.red, offset=offset)
+
+//stoch
+periodK = input.int(14, title="%K Length", minval=1,confirm=true,group = "Options")
+smoothK = input.int(1, title="%K Smoothing", minval=1,confirm=true,group = "Options")
+periodD = input.int(3, title="%D Smoothing", minval=1,confirm=true,group = "Options")
+k = ta.sma(ta.stoch(close, high, low, periodK), smoothK)
+d = ta.sma(k, periodD)
+// plot(k, title="%K", color=#2962FF)
+// plot(d, title="%D", color=#FF6D00)
+// h0 = hline(80, "Upper Band", color=#787B86)
+// h1 = hline(20, "Lower Band", color=#787B86)
+
+//begin strategy
+CrossBars = input.int(1,minval=0,title="Number of Bars to Confirm Cross")
+CrossOverConfirm(x,y) =>
+ ta.barssince(ta.crossover(x,y)) == CrossBars and x>=y
+CrossUnderConfirm(x,y) =>
+ ta.barssince(ta.crossunder(x,y)) == CrossBars and x<=y
+filterEmaLong = isFilterOn?filterEma>outNearEma:true
+filterEmaShort = isFilterOn?filterEma<outNearEma:true
+PK_X_PD =
+ //long                                                                                                                                 (30 M Trend is positive)                            (ema 100 slope positive)
+ k>d and ((k<lowerBand1 and d<lowerBand1) or (k[1]<lowerBand1 and d[1]<lowerBand1) or (k[2]<lowerBand1 and d[2]<lowerBand1)) and (outNearEma>outFarEma) and (high>close[1] and high>close[2]) and (open==low) and filterEmaLong?1
+ //short                                                                                                                                        (30 M Trend is negetive)                                 (ema 100 slope positive)
+ :k<d and ((k>upperBand1 and d>upperBand1) or (k[1]>upperBand1 and d[1]>upperBand1) or (k[2]>upperBand1 and d[2]>upperBand1)) and (outNearEma<outFarEma) and (low<close[1] and low<close[2]) and (open==high) and filterEmaShort?-1
+ :0
+PK_X_PD_Long = PK_X_PD>0
+PK_X_PD_Short = PK_X_PD<0
+
+
+
+if(InDateRange)
+    //strategy long
+    strategy.entry('buy',strategy.long,when=PK_X_PD_Long and trendIsLong and strategy.position_size ==0)
+    //strategy short
+    strategy.entry('short',strategy.short,when=PK_X_PD_Short and trendIsShort and strategy.position_size ==0)
+
+//alertcondition(PK_X_PD_Short or PK_X_PD_Long, "SStochEma Signal Alert",  "Go Trade with SStochEma Signal")
+
+inTrade = strategy.position_size //if <0 trade position is short and if >0 trade postion is long and if = 0 no postion 
+
+
+stopPrice = 0.0
+profitPrice = 0.0
+longProfitPrice = 0.0
+shortProfitPrice = 0.0
+changeStopPrice = false
+
+if strategy.position_size < 0
+    shortProfitPrice := strategy.position_avg_price * (1-tpShort2)
+    stopPrice := if (strategy.position_size < 0)
+        stopValue = strategy.position_avg_price * (1 + slShort)
+        if stopPrice[1] !=0 and low < stopPrice[1] * (1-(slShort* 2))
+            changeStopPrice := true
+            stopPrice[1] * (1-slShort)
+        else if stopPrice[1] > 0
+            math.min(stopValue,stopPrice[1])
+        else 
+            stopValue
+    else
+        0
+else if strategy.position_size > 0
+    longProfitPrice := strategy.position_avg_price * (1+tpLong2)
+    stopPrice := if (strategy.position_size > 0)
+        stopValue = strategy.position_avg_price * (1 - slLong)
+        if stopPrice[1] !=0 and high > stopPrice[1] * (1+(slLong* 2))
+            changeStopPrice := true
+            stopPrice[1] * (1+slLong)
+
+        else if stopPrice[1] > 0
+            math.max(stopValue,stopPrice[1])
+        else 
+            stopValue
+    else
+        0
+
+if changeStopPrice
+    alertsyntax_change_stop = '{' + '\"method\":\"changeStop\",\"changeStopPrice\":\"' + str.tostring(stopPrice) +'\",\"market\":\"' + syminfo.ticker + '\"}'
+    alert(message=alertsyntax_change_stop, freq=alert.freq_once_per_bar_close)
+        
+
+strategy.exit("TP3Short",from_entry="short",stop=stopPrice != 0? stopPrice:strategy.position_avg_price * (1 + slShort))
+    
+strategy.exit("TP2Buy",from_entry="buy",stop=stopPrice!=0?stopPrice:strategy.position_avg_price * (1 - slLong))
+
+plotshape(PK_X_PD_Long and inTrade==0,title="Signal Long",style=shape.triangleup,color=color.green,location=location.bottom,size=size.small)
+plotshape(PK_X_PD_Short and inTrade==0,title="Signal Short",style=shape.triangledown,color=color.red,location=location.top,size=size.small)
+
+//alert for call robot webhook
+if PK_X_PD_Long and trendIsLong and inTrade==0
+    enteryPriceCalculated = (close + open)/2
+    //alertsyntax_golong = '{' + '\"price\":\"' + str.tostring(strategy.position_avg_price) + '\",\"stoploss\":\"' + str.tostring(strategy.position_avg_price * slLong) + '\",\"takeprofit\":\"' + str.tostring(strategy.position_avg_price * tpLong) + '\",\"side\":2' + ',\"market\":\"' + syminfo.ticker + '\"}'
+    alertsyntax_golong = '{' + '\"price\":\"' + str.tostring(enteryPriceCalculated) + '\",\"stoploss\":\"' + str.tostring(enteryPriceCalculated * (1-slLong)) + '\",\"takeprofit\":\"' + str.tostring(enteryPriceCalculated * (1+tpLong2)) + '\",\"riskfree\":\"' + str.tostring(enteryPriceCalculated * (1+slLong)) + '\",\"takeprofit1\":\"' +  str.tostring(enteryPriceCalculated * (1+tpLong)) + '\",\"takeprofit1\":\"' + str.tostring(enteryPriceCalculated * (1+tpLong)) + '\",\"side\":2' + ',\"market\":\"' + syminfo.ticker + '\"}'
+    //alertsyntax_golong = '{' + '\"price\":\"' + str.tostring(strategy.position_avg_price) + '\",\"stoploss\":\"' + str.tostring(strategy.position_avg_price * (1-slLong)) + '\",\"takeprofit\":\"' + str.tostring(strategy.position_avg_price * (1+tpLong2)) + '\",\"riskfree\":\"' + str.tostring(strategy.position_avg_price * (1+slLong)) + '\",\"takeprofit1\":\"' +  str.tostring(strategy.position_avg_price * (1+tpLong)) + '\",\"takeprofit1\":\"' + str.tostring(strategy.position_avg_price * (1+tpLong)) + '\",\"side\":2' + ',\"market\":\"' + syminfo.ticker + '\"}'
+    alert(message=alertsyntax_golong, freq=alert.freq_once_per_bar_close)
+if PK_X_PD_Short and trendIsShort and inTrade==0
+    enteryPriceCalculated = (close + open)/2
+    //alertsyntax_goshort = '{' + '\"price\":\"' + str.tostring(strategy.position_avg_price) + '\",\"stoploss\":\"' + str.tostring(strategy.position_avg_price * slShort) + '\",\"takeprofit\":\"' + str.tostring(strategy.position_avg_price * tpShort) + '\",\"side\":1' + ',\"market\":\"' + syminfo.ticker + '\"}'
+    alertsyntax_goshort = '{' + '\"price\":\"' + str.tostring(enteryPriceCalculated) + '\",\"stoploss\":\"' + str.tostring(enteryPriceCalculated * (1+slShort)) + '\",\"takeprofit\":\"' + str.tostring(enteryPriceCalculated * (1-tpShort2)) +  '\",\"riskfree\":\"' + str.tostring(enteryPriceCalculated * (1-slShort)) +  '\",\"takeprofit1\":\"' + str.tostring(enteryPriceCalculated * (1-tpShort)) + '\",\"side\":1' + ',\"market\":\"' + syminfo.ticker + '\"}'
+    //alertsyntax_goshort = '{' + '\"price\":\"' + str.tostring(strategy.position_avg_price) + '\",\"stoploss\":\"' + str.tostring(strategy.position_avg_price * (1+slShort)) + '\",\"takeprofit\":\"' + str.tostring(strategy.position_avg_price * (1-tpShort2)) +  '\",\"riskfree\":\"' + str.tostring(strategy.position_avg_price * (1-slShort)) +  '\",\"takeprofit1\":\"' + str.tostring(strategy.position_avg_price * (1-tpShort)) + '\",\"side\":1' + ',\"market\":\"' + syminfo.ticker + '\"}'
+    alert(message=alertsyntax_goshort, freq=alert.freq_once_per_bar_close)
+
+
+//for sell and buy show risk/reward
+entery = plot(inTrade<0 ? strategy.position_avg_price :strategy.position_avg_price,color=color.purple,style=plot.style_circles,title="entery",trackprice=false)
+//profit = plot(inTrade<0 ? strategy.position_avg_price * (1-tpShort):strategy.position_avg_price * (1+tpLong),color=color.green,style=plot.style_circles,title="TP1",trackprice=false)
+profit2 = plot(inTrade<0 ? stopPrice<shortProfitPrice?stopPrice:shortProfitPrice:stopPrice>longProfitPrice?stopPrice:longProfitPrice,color=color.green,style=plot.style_circles,title="TP2",trackprice=false)
+//riskFree = plot(inTrade<0 ? strategy.position_avg_price * (1-slShort):strategy.position_avg_price * (1+slLong),color=color.yellow,style=plot.style_circles,title="Risk Free",trackprice=false)
+stop = plot(inTrade<0 ? strategy.position_avg_price * (1+slShort):strategy.position_avg_price * (1-slLong),color=color.red,style=plot.style_circles,title="SL",trackprice=false)
+stop2 = plot(inTrade<0?stopPrice:stopPrice,color=color.yellow,style=plot.style_circles,title="SL2",trackprice=false)
+fill(entery,profit2,title="Reward",color= color.new(color.green,65))
+fill(entery,stop,title="Risk",color= color.new(color.red,65))
+
+tableColumn = 2
+tableRow = 6
+var table panel = table.new(position.top_right, tableColumn, tableRow)
+table.cell(panel, 0, 0, "Hello Sassiz", bgcolor=color.new(color.black,65), text_color=color.white)
+table.cell(panel, 1, 0, "Lazy Bear", bgcolor=color.new(color.black,65), text_color=color.white)
+table.cell(panel, 0, 1, "Net Profit", bgcolor=color.new(color.black,65), text_color=color.white)
+table.cell(panel, 1, 1,str.tostring(strategy.netprofit), bgcolor=color.new(color.black,65), text_color=strategy.netprofit>0?color.green:color.red)
+table.cell(panel, 0, 2, "Winning Trade", bgcolor=color.new(color.black,65), text_color=color.white)
+table.cell(panel, 1, 2,str.tostring(strategy.wintrades), bgcolor=color.new(color.black,65), text_color=color.green)
+table.cell(panel, 0, 3, "Loss Trade", bgcolor=color.new(color.black,65), text_color=color.white)
+table.cell(panel, 1, 3,str.tostring(strategy.losstrades), bgcolor=color.new(color.black,65), text_color=color.red)
+table.cell(panel, 0, 4, "Max Down", bgcolor=color.new(color.black,65), text_color=color.white)
+table.cell(panel, 1, 4,str.tostring(strategy.max_drawdown), bgcolor=color.new(color.black,65), text_color=color.red)
+table.cell(panel, 0, 5, "R&R", bgcolor=color.new(color.black,65), text_color=color.white)
+table.cell(panel, 1, 5,str.tostring(tpLong2/slLong), bgcolor=color.new(color.black,65), text_color=color.red)
