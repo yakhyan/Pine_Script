@@ -1,0 +1,28 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © trustingTortoi46246
+
+//@version=5
+strategy("three_brothers_strategy", overlay=true,shorttitle='3_bros_stg')
+
+bullish_bros = close[1] > open[1] and (close[1]-open[1]) < (close[2]-open[2]) and (close[2]-open[2]) < (close[3]-open[3]) and close[0] < open[0]
+bearish_bros = close[1] < open[1] and (open[1]-close[1]) < (open[2]-close[2]) and (open[2]-close[2]) < (open[3]-close[3]) and close[0] > open[0]
+// plotshape(bullish_bros,title='sell',color=color.red,text='Sell',textcolor=color.red,style=shape.arrowdown)
+// plotshape(bearish_bros,title='buy',color=color.green,text='Buy',textcolor=color.green,style=shape.arrowup)
+
+// var takeprofit = 0.0
+// var stoploss = 0.0
+
+// if bearish_bros
+//     strategy.entry("buy",strategy.long,qty=0.01)
+//     takeprofit := open[3]
+//     stoploss := close + (close - open[2])
+// //    
+// strategy.close(id='buy',when = high>= takeprofit or low<=stoploss )    
+// //or
+// // strategy.exit(id='buy',limit=takeprofit,stop=stoploss)
+
+//third method
+strategy.entry('buy',strategy.long,when=bearish_bros)
+//strategy.close(id='buy',when = high > strategy.position_avg_price * 1.015 or low < strategy.position_avg_price * 0.99)
+strategy.exit('buy',limit = strategy.position_avg_price * 1.015,stop=strategy.position_avg_price * 0.99)
+// strategy.entry("sell",strategy.short,qty=0.01,when=bullish_bros)
