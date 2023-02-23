@@ -1,0 +1,84 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © mohammadrezapour622
+
+//@version=5
+strategy("Sassiz Ichimoku",shorttitle="SassizMoku",overlay=true)
+
+//input
+TK_length = input.int(9,title="Tenken Length",minval=1)
+KJ_length = input.int(26,title="Kijun Length",minval=1)
+SKB_length = input.int(52,title="Senkou Span B Length",minval=1)
+Offset = input.int(26,title="Displacement",minval=1)
+rsiHighValue = input.int(70,title="Rsi High",minval=50)
+rsiLowValue = input.int(30,title="Rsi Low",minval=10)
+slLong = input.float(0.996,title="sl Long")
+tpLong = input.float(1.008,title="tp long")
+slShort = input.float(1.004,title="sl short")
+tpShort = input.float(0.992,title="tp short")
+
+Midpoint(len) => math.avg(ta.highest(len),ta.lowest(len))
+
+//calculate tenkan,kijun,chikou,senkou span A, senkou span B
+TK = Midpoint(TK_length)
+KJ = Midpoint(KJ_length)
+SKA = math.avg(TK,KJ)
+SKB = Midpoint(SKB_length)
+CK = close
+
+//plot 5 ichimoku line
+plot(TK,title="Tenken",color = color.aqua,linewidth=2)
+plot(KJ,title="Kijun",color = color.red,linewidth=2)
+plot(CK,title="Chikou",color = color.lime,linewidth=1,offset = -Offset+1)
+SKA_plot = plot(SKA,title="Senkou Span A",color = color.green,linewidth=1,offset = Offset-1)
+SKB_plot = plot(SKB,title="Senkou Span B",color = color.red,linewidth=1,offset = Offset-1)
+
+Kumo_Color = SKA >= SKB? color.new(color.green,65): color.new(color.maroon,65)
+fill(SKA_plot,SKB_plot,color = Kumo_Color)
+
+//end of calculate and shape ichimoku line
+
+//Start strategy function 
+rsiVal = ta.rsi(close,14)
+CrossBars = input.int(1,minval=0,title="Number of Bars to Confirm Cross")
+CrossOverConfirm(x,y) =>
+ ta.barssince(ta.crossover(x,y)) == CrossBars and x>=y
+CrossUnderConfirm(x,y) =>
+ ta.barssince(ta.crossunder(x,y)) == CrossBars and x<=y
+
+//condition chikou cross kijun
+// condition_chikou_x_kijun = input(true,title="Show Chikou crossed Kijun")
+// CK_X_KJ = 
+//  CrossOverConfirm(CK,KJ[Offset])?1
+//  :CrossUnderConfirm(CK,KJ[Offset])?-1
+//  :0
+// CK_X_KJ_ColUp = color.new(color.green,0)
+// CK_X_KJ_ColDn = color.new(color.red,0)
+
+// plotarrow(condition_chikou_x_kijun and CK_X_KJ !=0?CK_X_KJ:na,title="Chikou Crossed Kijun!",colorup = CK_X_KJ_ColUp,colordown=CK_X_KJ_ColDn,maxheight=50,minheight=30)
+
+//condition tenkan cross kijun and chikou is clear
+condition_tenkan_x_kijun = input(true,title="Show Tenkan crossed Kijun")
+TK_X_KJ = 
+//long
+//( cross over tk and kj)    (      ck clear                                                      )    (  price> tk and kj)    (                     price > komu       ) 
+ CrossOverConfirm(TK,KJ) and (CK>TK and CK>SKA[(Offset-1)*2] and CK>SKB[(Offset-1)*2] ) and (low>TK and low>KJ) and (low>SKA[Offset-1] and low>SKB[Offset-1]) and (SKA>SKB) and (KJ>KJ[1] and SKB>SKB[1]) and rsiVal<rsiHighValue?1
+ //short
+ :CrossUnderConfirm(TK,KJ) and (CK<low[Offset-1] and CK<SKA[(Offset-1)*2] and CK<SKB[(Offset-1)*2] ) and (low<TK and low<KJ) and (low<SKA[Offset-1] and low<SKB[Offset-1]) and (SKA<SKB) and (KJ<KJ[1] and SKB<SKB[1]) and rsiVal>rsiLowValue?-1
+ :0
+// TK_X_KJ_ColUp = color.new(color.yellow,0)
+// TK_X_KJ_ColDn = color.new(color.purple,0)
+TK_X_KJ_Long = TK_X_KJ > 0
+TK_X_KJ_Short = TK_X_KJ < 0
+plotshape(TK_X_KJ_Long and condition_tenkan_x_kijun,title="Ichi Gold Signal Long",style=shape.triangleup,color=color.green,location=location.bottom,size=size.small)
+plotshape(TK_X_KJ_Short and condition_tenkan_x_kijun,title="Ichi Gold Signal Short",style=shape.triangledown,color=color.red,location=location.top,size=size.small)
+// plotarrow(condition_tenkan_x_kijun and TK_X_KJ !=0?TK_X_KJ:na,title="Tenkan Crossed Kijun!",colorup = TK_X_KJ_ColUp,colordown=TK_X_KJ_ColDn,maxheight=50,minheight=30)
+
+//strategy long
+strategy.entry('buy',strategy.long,when=TK_X_KJ_Long and condition_tenkan_x_kijun)
+//strategy.exit('buy',limit = strategy.position_avg_price * 1.008,stop=strategy.position_avg_price * 0.996)
+strategy.exit('buy',limit = strategy.position_avg_price * tpLong,stop=strategy.position_avg_price * slLong)
+//strategy short
+strategy.entry('short',strategy.short,when=TK_X_KJ_Short and condition_tenkan_x_kijun)
+//strategy.exit('short',limit = strategy.position_avg_price * 0.992,stop=strategy.position_avg_price * 1.004)
+strategy.exit('short',limit = strategy.position_avg_price * tpShort,stop=strategy.position_avg_price * slShort)
+
