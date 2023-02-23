@@ -1,5 +1,4 @@
 // This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
-// © leiie9e9e
 
 //@version=5
 strategy("sassiz chandelier Exit", overlay=true)
